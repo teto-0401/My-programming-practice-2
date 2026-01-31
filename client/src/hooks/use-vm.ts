@@ -121,3 +121,56 @@ export function useStopVm() {
     },
   });
 }
+
+// Snapshot hooks
+export function useSnapshots() {
+  return useQuery({
+    queryKey: [api.vm.listSnapshots.path],
+    queryFn: async () => {
+      const res = await fetch(api.vm.listSnapshots.path);
+      if (!res.ok) throw new Error("Failed to fetch snapshots");
+      return res.json() as Promise<Array<{ name: string; createdAt: string; size: number }>>;
+    },
+  });
+}
+
+export function useSaveSnapshot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch(api.vm.saveSnapshot.path, {
+        method: api.vm.saveSnapshot.method,
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message);
+      }
+      return res.json() as Promise<{ success: boolean; name: string; message: string }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.vm.listSnapshots.path] });
+    },
+  });
+}
+
+export function useDeleteSnapshot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch(`/api/vm/snapshot/${name}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message);
+      }
+      return res.json() as Promise<{ success: boolean; message: string }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.vm.listSnapshots.path] });
+    },
+  });
+}

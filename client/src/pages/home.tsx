@@ -1,8 +1,8 @@
-import { useVm, useStartVm, useStopVm } from "@/hooks/use-vm";
+import { useVm, useStartVm, useStopVm, useSnapshots, useSaveSnapshot, useDeleteSnapshot } from "@/hooks/use-vm";
 import { FileUploader } from "@/components/file-uploader";
 import { VmDisplay } from "@/components/vm-display";
 import { StatusBadge } from "@/components/status-badge";
-import { Power, Square, Terminal, Cpu, HardDrive, Activity } from "lucide-react";
+import { Power, Square, Terminal, Cpu, HardDrive, Activity, Save, Trash2, Camera } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -10,10 +10,38 @@ export default function Home() {
   const { data: vm, isLoading } = useVm();
   const { mutate: startVm, isPending: isStarting } = useStartVm();
   const { mutate: stopVm, isPending: isStopping } = useStopVm();
+  const { data: snapshots } = useSnapshots();
+  const { mutate: saveSnapshot, isPending: isSaving } = useSaveSnapshot();
+  const { mutate: deleteSnapshot } = useDeleteSnapshot();
   const { toast } = useToast();
 
   const isRunning = vm?.status === "running";
   const hasImage = !!vm?.imagePath;
+
+  const handleSaveSnapshot = () => {
+    saveSnapshot(undefined, {
+      onSuccess: (data) => {
+        toast({ title: "Snapshot Saved", description: `State saved as ${data.name}` });
+      },
+      onError: (e) => {
+        toast({ title: "Save Failed", description: e.message, variant: "destructive" });
+      },
+    });
+  };
+
+  const handleDeleteSnapshot = (name: string) => {
+    deleteSnapshot(name, {
+      onSuccess: () => {
+        toast({ title: "Snapshot Deleted", description: `${name} has been removed` });
+      },
+    });
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  };
 
   const handleStart = () => {
     if (!hasImage) {
@@ -152,6 +180,59 @@ export default function Home() {
               </h2>
               
               <FileUploader currentImage={vm?.imagePath} />
+            </motion.div>
+
+            {/* Snapshots Card */}
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-card rounded-2xl border border-border p-6 shadow-xl"
+            >
+              <h2 className="text-lg font-display font-bold mb-4 flex items-center gap-2">
+                <Camera className="w-5 h-5 text-primary" />
+                SNAPSHOTS
+              </h2>
+
+              <button
+                onClick={handleSaveSnapshot}
+                disabled={!isRunning || isSaving}
+                data-testid="button-save-snapshot"
+                className={`
+                  w-full mb-4 flex items-center justify-center gap-2 rounded-xl p-3 border transition-all duration-300
+                  ${!isRunning 
+                    ? "opacity-50 cursor-not-allowed border-border bg-muted/20" 
+                    : "border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary"}
+                `}
+              >
+                <Save className="w-5 h-5" />
+                <span className="font-bold text-sm">{isSaving ? "SAVING..." : "SAVE STATE"}</span>
+              </button>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {snapshots?.length === 0 && (
+                  <p className="text-muted-foreground text-sm text-center py-4">No snapshots yet</p>
+                )}
+                {snapshots?.map((snapshot) => (
+                  <div 
+                    key={snapshot.name}
+                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/50"
+                    data-testid={`snapshot-item-${snapshot.name}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-mono truncate">{new Date(snapshot.createdAt).toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">{formatSize(snapshot.size)}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteSnapshot(snapshot.name)}
+                      className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                      data-testid={`button-delete-snapshot-${snapshot.name}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </motion.div>
           </div>
 

@@ -37,5 +37,28 @@ export const api = {
         400: z.object({ message: z.string() }),
       },
     },
+    saveSnapshot: {
+      method: 'POST' as const,
+      path: '/api/vm/snapshot/save',
+      responses: {
+        200: z.object({ success: z.boolean(), name: z.string(), message: z.string() }),
+        400: z.object({ message: z.string() }),
+      },
+    },
+    listSnapshots: {
+      method: 'GET' as const,
+      path: '/api/vm/snapshots',
+      responses: {
+        200: z.array(z.object({ name: z.string(), createdAt: z.string(), size: z.number() })),
+      },
+    },
+    deleteSnapshot: {
+      method: 'DELETE' as const,
+      path: '/api/vm/snapshot/:name',
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string() }),
+        400: z.object({ message: z.string() }),
+      },
+    },
   },
 };
