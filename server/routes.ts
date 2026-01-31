@@ -45,26 +45,32 @@ class QemuManager {
     const isBinOrImg = extension === 'bin' || extension === 'img';
 
     const args = [
-      '-m', '2G', 
-      '-smp', '2', 
+      '-m', '1G', 
+      '-smp', '1',
+      '-cpu', 'max',
       '-vnc', '127.0.0.1:0',
-      '-net', 'nic,model=virtio',
-      '-net', 'user',
+      '-device', 'usb-ehci',
+      '-device', 'usb-tablet', // Enables absolute mouse positioning
       '-vga', 'std',
-      '-boot', 'd', // Boot from CD-ROM first, then HDD
     ];
 
     // Add drive based on file type
     if (isISO) {
       // ISO files should be mounted as CD-ROM
       args.push('-cdrom', imagePath);
+      args.push('-boot', 'd'); // Boot from CD-ROM
       console.log("Mounting as CD-ROM (ISO)");
     } else {
-      // BIN/IMG files are bootable disk images
-      args.push('-drive', `file=${imagePath},format=raw,if=virtio`);
-      args.push('-boot', 'c'); // Override to boot from hard drive for bin/img
+      // BIN/IMG files - try multiple interface types for compatibility
+      // Use IDE for better compatibility with various OS images
+      args.push('-drive', `file=${imagePath},format=raw,if=ide,index=0,media=disk`);
+      args.push('-boot', 'c'); // Boot from hard drive
       console.log("Mounting as hard drive (BIN/IMG)");
     }
+    
+    // Add network
+    args.push('-net', 'nic,model=e1000');
+    args.push('-net', 'user');
 
     if (fs.existsSync('/dev/kvm')) {
       args.unshift('-enable-kvm');
