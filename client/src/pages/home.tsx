@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { useVm, useStartVm, useStopVm, useSnapshots, useSaveSnapshot, useDeleteSnapshot, useUpdateVmSettings } from "@/hooks/use-vm";
+import { useVm, useStartVm, useStopVm, useSnapshots, useSaveSnapshot, useDeleteSnapshot, useUpdateVmSettings, useStartFromSnapshot } from "@/hooks/use-vm";
 import { FileUploader } from "@/components/file-uploader";
 import { VmDisplay } from "@/components/vm-display";
 import { StatusBadge } from "@/components/status-badge";
-import { Power, Square, Terminal, Cpu, HardDrive, Activity, Save, Trash2, Camera, Settings, MemoryStick, Monitor } from "lucide-react";
+import { Power, Square, Terminal, Cpu, HardDrive, Activity, Save, Trash2, Camera, Settings, MemoryStick, Monitor, Play } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,10 +15,26 @@ export default function Home() {
   const { mutate: saveSnapshot, isPending: isSaving } = useSaveSnapshot();
   const { mutate: deleteSnapshot } = useDeleteSnapshot();
   const { mutate: updateSettings, isPending: isUpdating } = useUpdateVmSettings();
+  const { mutate: startFromSnapshot, isPending: isRestoring } = useStartFromSnapshot();
   const { toast } = useToast();
 
   const [ramMb, setRamMb] = useState(512);
   const [vramMb, setVramMb] = useState(16);
+
+  const handleStartFromSnapshot = (snapshotName: string) => {
+    if (!hasImage) {
+      toast({ title: "No disk image", description: "Upload an image first", variant: "destructive" });
+      return;
+    }
+    startFromSnapshot(snapshotName, {
+      onSuccess: () => {
+        toast({ title: "VM Restored", description: `Started from ${snapshotName}` });
+      },
+      onError: (e) => {
+        toast({ title: "Restore Failed", description: e.message, variant: "destructive" });
+      },
+    });
+  };
 
   useEffect(() => {
     if (vm) {
@@ -321,20 +337,31 @@ export default function Home() {
                 {snapshots?.map((snapshot) => (
                   <div 
                     key={snapshot.name}
-                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/50"
+                    className="flex items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg border border-border/50"
                     data-testid={`snapshot-item-${snapshot.name}`}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-mono truncate">{new Date(snapshot.createdAt).toLocaleString()}</p>
                       <p className="text-xs text-muted-foreground">{formatSize(snapshot.size)}</p>
                     </div>
-                    <button
-                      onClick={() => handleDeleteSnapshot(snapshot.name)}
-                      className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                      data-testid={`button-delete-snapshot-${snapshot.name}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleStartFromSnapshot(snapshot.name)}
+                        disabled={isRunning || isRestoring}
+                        className="p-2 text-green-500 hover:bg-green-500/10 rounded-lg transition-colors disabled:opacity-50"
+                        data-testid={`button-start-snapshot-${snapshot.name}`}
+                        title="Start from this snapshot"
+                      >
+                        <Play className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSnapshot(snapshot.name)}
+                        className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                        data-testid={`button-delete-snapshot-${snapshot.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

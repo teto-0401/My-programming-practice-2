@@ -197,3 +197,26 @@ export function useUpdateVmSettings() {
     },
   });
 }
+
+// POST /api/vm/start-from-snapshot
+export function useStartFromSnapshot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (snapshotName: string) => {
+      const res = await fetch('/api/vm/start-from-snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshotName }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message);
+      }
+      return res.json() as Promise<{ success: boolean; message: string }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.vm.get.path] });
+    },
+  });
+}
