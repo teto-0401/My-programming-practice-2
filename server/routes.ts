@@ -7,16 +7,14 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { spawn, type ChildProcess } from "child_process";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 import { WebSocketServer, WebSocket } from "ws";
 import net from "net";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Use cwd to avoid import.meta.url in CJS bundles (Render runtime executes CJS)
+const baseDir = process.cwd();
 
 // Configure storage for large binary uploads
-const uploadDir = path.join(__dirname, "../uploads");
+const uploadDir = path.join(baseDir, "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -39,7 +37,7 @@ const upload = multer({
 });
 
 // Snapshots directory
-const snapshotsDir = path.join(__dirname, "../snapshots");
+const snapshotsDir = path.join(baseDir, "snapshots");
 if (!fs.existsSync(snapshotsDir)) {
   fs.mkdirSync(snapshotsDir, { recursive: true });
 }
