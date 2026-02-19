@@ -48,6 +48,8 @@ class QemuManager {
   private currentImage: string | null = null;
   private monitorSocket: net.Socket | null = null;
   private qmpSocket: net.Socket | null = null;
+  private vncPort: number = Number(process.env.VNC_PORT ?? 6000);
+  private vncDisplay: number = 1;
 
   async start(imagePath: string, originalFilename?: string | null, ramMb: number = 512, vramMb: number = 16) {
     if (this.process) {
@@ -68,13 +70,16 @@ class QemuManager {
     // - 'cirrus' VGA is simpler than 'std', uses less CPU for rendering
     // - '-rtc base=utc' prevents busy-loop clock sync
     // - Single CPU core reduces scheduling overhead
+    this.vncPort = Number(process.env.VNC_PORT ?? 6000);
+    this.vncDisplay = Math.max(0, this.vncPort - 5900);
+
     const args = [
       '-m', `${ramMb}M`, // Explicit RAM setting
       '-smp', '1', // Single core = less scheduling overhead
       '-cpu', 'qemu64', // Simpler CPU model = less emulation overhead
       '-icount', 'shift=auto,sleep=on', // Throttle CPU, reduces host usage 40%->10%
       '-rtc', 'base=utc,clock=vm', // Prevent clock busy-loop
-      '-vnc', '127.0.0.1:0', // Plain ws, no encryption
+      '-vnc', `127.0.0.1:${this.vncDisplay}`, // Plain ws, no encryption
       '-device', 'usb-ehci',
       '-device', 'usb-tablet', // Absolute mouse positioning
       '-vga', 'cirrus', // Cirrus VGA = simpler, less CPU than std VGA
@@ -226,13 +231,16 @@ class QemuManager {
     const extension = originalFilename?.split('.').pop()?.toLowerCase() || '';
     const isISO = extension === 'iso';
 
+    this.vncPort = Number(process.env.VNC_PORT ?? 6000);
+    this.vncDisplay = Math.max(0, this.vncPort - 5900);
+
     const args = [
       '-m', `${ramMb}M`,
       '-smp', '1',
       '-cpu', 'qemu64',
       '-icount', 'shift=auto,sleep=on',
       '-rtc', 'base=utc,clock=vm',
-      '-vnc', '127.0.0.1:0',
+      '-vnc', `127.0.0.1:${this.vncDisplay}`,
       '-device', 'usb-ehci',
       '-device', 'usb-tablet',
       '-vga', 'cirrus',
@@ -307,7 +315,7 @@ export async function registerRoutes(
     console.log("Client connected to VNC Proxy");
     
     // Connect to QEMU VNC server
-    const vncClient = net.createConnection(5900, 'localhost');
+    const vncClient = net.createConnection(Number(process.env.VNC_PORT ?? 6000), 'localhost');
 
     vncClient.on('connect', () => {
       console.log("Connected to QEMU VNC");
