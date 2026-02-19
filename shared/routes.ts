@@ -60,5 +60,26 @@ export const api = {
         400: z.object({ message: z.string() }),
       },
     },
+    listImages: {
+      method: 'GET' as const,
+      path: '/api/vm/images',
+      responses: {
+        200: z.array(z.object({
+          id: z.number(),
+          filename: z.string(),
+          sizeBytes: z.number(),
+          createdAt: z.string(),
+        })),
+      },
+    },
+    mountImage: {
+      method: 'POST' as const,
+      path: '/api/vm/images/:id/mount',
+      responses: {
+        200: z.object({ success: z.boolean(), message: z.string(), filename: z.string() }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
   },
 };

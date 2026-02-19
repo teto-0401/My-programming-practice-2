@@ -36,6 +36,8 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 * 1024 } // 10GB limit
 });
 
+const maxDbImageBytes = Number(process.env.MAX_DB_IMAGE_MB ?? 200) * 1024 * 1024;
+
 // Snapshots directory
 const snapshotsDir = path.join(baseDir, "snapshots");
 if (!fs.existsSync(snapshotsDir)) {
@@ -366,13 +368,31 @@ export async function registerRoutes(
       return res.status(400).json({ message: "No file uploaded" });
     }
 
+    const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileSize = req.file.size ?? fs.statSync(req.file.path).size;
+
     const vm = await storage.createOrUpdateVm({
       imagePath: req.file.path,
       imageFilename: req.file.originalname,
       status: 'stopped'
     });
 
-    res.json({ success: true, path: req.file.path, filename: req.file.originalname });
+    let storedImageId: number | null = null;
+    if (fileSize <= maxDbImageBytes) {
+      try {
+        const fileBuffer = await fs.promises.readFile(req.file.path);
+        const stored = await storage.createImage({
+          filename: safeName,
+          contentBase64: fileBuffer.toString("base64"),
+          sizeBytes: fileSize,
+        });
+        storedImageId = stored.id;
+      } catch (e) {
+        console.error("Failed to store image in DB:", e);
+      }
+    }
+
+    res.json({ success: true, path: req.file.path, filename: req.file.originalname, storedImageId });
   });
 
   app.post(api.vm.start.path, async (req, res) => {
@@ -423,6 +443,47 @@ export async function registerRoutes(
       await storage.updateVmStatus(vm.id, 'stopped');
     }
     res.json({ success: true, message: "VM stopped" });
+  });
+
+  // List stored images (from DB)
+  app.get(api.vm.listImages.path, async (_req, res) => {
+    const images = await storage.listImages();
+    res.json(images.map(img => ({
+      id: img.id,
+      filename: img.filename,
+      sizeBytes: img.sizeBytes,
+      createdAt: img.createdAt?.toISOString?.() ?? new Date().toISOString(),
+    })));
+  });
+
+  // Mount a stored image back to the VM (write to uploads)
+  app.post(api.vm.mountImage.path, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ message: "Invalid image id" });
+    }
+
+    const image = await storage.getImage(id);
+    if (!image) {
+      return res.status(404).json({ message: "Image not found" });
+    }
+
+    const safeName = image.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const restorePath = path.join(uploadDir, safeName);
+
+    try {
+      const buffer = Buffer.from(image.contentBase64, "base64");
+      await fs.promises.writeFile(restorePath, buffer);
+      const vm = await storage.createOrUpdateVm({
+        imagePath: restorePath,
+        imageFilename: image.filename,
+        status: 'stopped',
+      });
+      res.json({ success: true, message: "Image mounted", filename: vm.imageFilename ?? image.filename });
+    } catch (e: any) {
+      console.error("Failed to restore image:", e);
+      res.status(500).json({ message: "Failed to restore image" });
+    }
   });
 
   // Start VM from snapshot

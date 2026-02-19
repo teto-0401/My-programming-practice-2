@@ -1,14 +1,18 @@
 import { useState, useRef } from "react";
 import { Upload, CheckCircle, Loader2 } from "lucide-react";
-import { useUploadVmImage } from "@/hooks/use-vm";
+import { useUploadVmImage, useStoredImages, useMountStoredImage } from "@/hooks/use-vm";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 
 export function FileUploader({ currentImage }: { currentImage?: string | null }) {
   const [dragActive, setDragActive] = useState(false);
+  const [mountingId, setMountingId] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { upload, progress, isUploading } = useUploadVmImage();
+  const { data: storedImages, isLoading: isLoadingImages } = useStoredImages();
+  const { mutate: mountImage } = useMountStoredImage();
   const { toast } = useToast();
 
   const handleDrag = (e: React.DragEvent) => {
@@ -167,6 +171,53 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
           <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] flex items-center justify-center">
             <p className="text-lg font-bold text-primary animate-pulse">DROP TO UPLOAD</p>
           </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Saved Images</h4>
+        {isLoadingImages ? (
+          <div className="text-xs text-muted-foreground">Loading...</div>
+        ) : storedImages && storedImages.length > 0 ? (
+          <div className="space-y-2">
+            {storedImages.map((img) => (
+              <div key={img.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-foreground truncate">{img.filename}</div>
+                  <div className="text-xs text-muted-foreground">{formatFileSize(img.sizeBytes)}</div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={mountingId === img.id}
+                  onClick={() => {
+                    setMountingId(img.id);
+                    mountImage(img.id, {
+                      onSuccess: (data) => {
+                        toast({
+                          title: "Image mounted",
+                          description: data.filename,
+                        });
+                        setMountingId(null);
+                      },
+                      onError: (error) => {
+                        toast({
+                          title: "Mount failed",
+                          description: error.message,
+                          variant: "destructive",
+                        });
+                        setMountingId(null);
+                      },
+                    });
+                  }}
+                >
+                  {mountingId === img.id ? "Mounting..." : "Mount"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground">No saved images yet.</div>
         )}
       </div>
     </div>

@@ -134,6 +134,43 @@ export function useSnapshots() {
   });
 }
 
+// GET /api/vm/images
+export function useStoredImages() {
+  return useQuery({
+    queryKey: [api.vm.listImages.path],
+    queryFn: async () => {
+      const res = await fetch(api.vm.listImages.path);
+      if (!res.ok) throw new Error("Failed to fetch stored images");
+      return api.vm.listImages.responses[200].parse(await res.json());
+    },
+  });
+}
+
+// POST /api/vm/images/:id/mount
+export function useMountStoredImage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/vm/images/${id}/mount`, {
+        method: api.vm.mountImage.method,
+      });
+      if (res.status === 404) {
+        const error = api.vm.mountImage.responses[404].parse(await res.json());
+        throw new Error(error.message);
+      }
+      if (!res.ok) {
+        const error = api.vm.mountImage.responses[400].parse(await res.json());
+        throw new Error(error.message);
+      }
+      return api.vm.mountImage.responses[200].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.vm.get.path] });
+      queryClient.invalidateQueries({ queryKey: [api.vm.listImages.path] });
+    },
+  });
+}
+
 export function useSaveSnapshot() {
   const queryClient = useQueryClient();
   return useMutation({

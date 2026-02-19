@@ -18,6 +18,8 @@ QEMU / noVNC based virtual OS simulator with a Node.js + Express backend, Vite +
 ## Environment
 - `DATABASE_URL` (required). Render-issued Postgres access token URL, e.g. `postgresql://abc_d...`
 - `PORT` (default 5000)
+- `VNC_PORT` (default 6000)
+- `MAX_DB_IMAGE_MB` (default 200). Max upload size to persist in DB for reuse.
 
 ## Docker
 `Dockerfile` builds a multi-stage image and runs `node dist/index.cjs`.

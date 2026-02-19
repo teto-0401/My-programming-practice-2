@@ -1,14 +1,17 @@
 
 import { db } from "./db";
-import { vms, type Vm, type InsertVm } from "@shared/schema";
+import { vms, vmImages, type Vm, type InsertVm, type VmImage, type InsertVmImage } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getVm(): Promise<Vm | undefined>;
   createOrUpdateVm(vm: Partial<InsertVm>): Promise<Vm>;
   updateVmStatus(id: number, status: string): Promise<Vm>;
-  updateVmImage(id: number, imagePath: string): Promise<Vm>;
+  updateVmImage(id: number, imagePath: string, imageFilename?: string): Promise<Vm>;
   updateVmSettings(id: number, settings: { ramMb?: number; vramMb?: number }): Promise<Vm>;
+  listImages(): Promise<VmImage[]>;
+  createImage(image: InsertVmImage): Promise<VmImage>;
+  getImage(id: number): Promise<VmImage | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -61,6 +64,20 @@ export class DatabaseStorage implements IStorage {
       .where(eq(vms.id, id))
       .returning();
     return updated;
+  }
+
+  async listImages(): Promise<VmImage[]> {
+    return db.select().from(vmImages).orderBy(vmImages.createdAt);
+  }
+
+  async createImage(image: InsertVmImage): Promise<VmImage> {
+    const [created] = await db.insert(vmImages).values(image).returning();
+    return created;
+  }
+
+  async getImage(id: number): Promise<VmImage | undefined> {
+    const [image] = await db.select().from(vmImages).where(eq(vmImages.id, id)).limit(1);
+    return image;
   }
 }
 
