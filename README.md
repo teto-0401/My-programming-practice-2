@@ -63,3 +63,5 @@ https://github.com/teto-0401/My-programming-practice
 - 2026-02-21: Client polling adjusted to stop refetching `/api/vm` on error (avoid repeated reload on 500) and added verbose client-side API logs across VM hooks for clearer diagnostics.
 - 2026-02-21: Observed `Uncaught exception: Error: Connection terminated unexpectedly` from `pg` client; added Postgres pool error handler and enabled keepalive to avoid process crash on idle client errors.
 - 2026-02-21: Deployment prep: Render target assumes ephemeral filesystem; long-term plan is DB-only storage for ISO and snapshots (stop relying on `uploads/`). Replit setup is ~90% complete; will duplicate for Render with storage changes.
+- 2026-02-21: Adjusted noVNC defaults to reduce cursor misalignment and improve FPS by switching to remote resize, enabling view clip, and tuning quality/compression defaults.
+- 2026-02-21: Render deploy shows `getaddrinfo ENOTFOUND dpg-d6ap3goboq4c73dhnrh0-a` for DB host, indicating an invalid or incomplete `DATABASE_URL` on Render (hostname missing full domain).
