@@ -300,9 +300,6 @@ async function resetVmStatus() {
     await storage.updateVmStatus(vm.id, 'stopped');
   }
 }
-resetVmStatus().catch((err) => {
-  console.error("Failed to reset VM status on startup:", err);
-});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -310,8 +307,20 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   // Create WebSocket Server for VNC Proxy
-  // Listen on /websockify to match default noVNC behavior
-  const wss = new WebSocketServer({ server: httpServer, path: '/websockify' });
+  // Use noServer mode so this WS handler only consumes /websockify upgrades
+  // and never interferes with Vite HMR websocket upgrades.
+  const wss = new WebSocketServer({ noServer: true });
+
+  httpServer.on("upgrade", (request, socket, head) => {
+    const url = request.url ?? "";
+    if (!url.startsWith("/websockify")) {
+      return;
+    }
+
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request);
+    });
+  });
 
   wss.on('connection', (ws) => {
     console.log("Client connected to VNC Proxy");
@@ -352,6 +361,10 @@ export async function registerRoutes(
       console.error("WebSocket Error:", err);
       vncClient.end();
     });
+  });
+
+  resetVmStatus().catch((err) => {
+    console.error("Failed to reset VM status on startup:", err);
   });
 
   app.get(api.vm.get.path, async (req, res) => {

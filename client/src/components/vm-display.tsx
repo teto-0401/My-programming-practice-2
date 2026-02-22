@@ -48,7 +48,7 @@ export function VmDisplay({ isRunning }: VmDisplayProps) {
         <div className="flex items-center gap-2">
           <button 
             onClick={refreshDisplay}
-            className="p-1.5 hover:bg-white/10 rounded-md text-muted-foreground hover:text-white transition-colors"
+            className="p-1.5 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground transition-colors"
             title="Refresh Display"
           >
             <RefreshCw className="w-4 h-4" />
@@ -57,7 +57,7 @@ export function VmDisplay({ isRunning }: VmDisplayProps) {
             href="/novnc/vnc.html?autoconnect=true&reconnect=true" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="p-1.5 hover:bg-white/10 rounded-md text-muted-foreground hover:text-white transition-colors"
+            className="p-1.5 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground transition-colors"
             title="Open in New Tab"
           >
             <Expand className="w-4 h-4" />

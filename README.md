@@ -20,6 +20,7 @@ QEMU / noVNC based virtual OS simulator with a Node.js + Express backend, Vite +
 - `PORT` (default 5000)
 - `VNC_PORT` (default 6000)
 - `MAX_DB_IMAGE_MB` (default 200). Max upload size to persist in DB for reuse.
+- `COLOR` (optional, default `DARK`). UI color mode for client theme. Supported values: `DARK` (current theme) or `WHITE` (gray-based light theme).
 
 ## Docker
 `Dockerfile` builds a multi-stage image and runs `node dist/index.cjs`.
@@ -55,6 +56,9 @@ https://github.com/teto-0401/My-programming-practice
 ```
 
 ## Status
+- 2026-02-22: Added startup DB bootstrap (`CREATE TABLE IF NOT EXISTS` for `vms` and `vm_images`) so app can recover when connected to a fresh DB without running migrations first.
+- 2026-02-22: Fixed websocket upgrade conflict by switching VNC proxy `ws` server to `noServer` mode and handling only `/websockify`, avoiding interference with Vite HMR websocket.
+- 2026-02-22: Added `COLOR` env-based UI theme switch for `npm run dev` client rendering. `COLOR=DARK` keeps current dark UI; `COLOR=WHITE` applies a gray-based light theme via CSS variables and adjusted VM display header hover colors for readability.
 - 2026-02-21: Project context noted. README updated with status/push workflow.
 - 2026-02-21: `dev` run showed DB error `relation "vm_images" does not exist` on `/api/vm/images`, and QEMU failed to open ISO at `/app/uploads/TinyCore-16.1.iso` (file missing). API reported success but VM stopped immediately.
 - 2026-02-21: Vite HMR websocket failed to connect in Replit-style URL. Repeated DB failures including `relation "vm_images" does not exist` and later `Connection terminated unexpectedly` on `/api/vm` and `/api/vm/images`.
@@ -65,3 +69,4 @@ https://github.com/teto-0401/My-programming-practice
 - 2026-02-21: Deployment prep: Render target assumes ephemeral filesystem; long-term plan is DB-only storage for ISO and snapshots (stop relying on `uploads/`). Replit setup is ~90% complete; will duplicate for Render with storage changes.
 - 2026-02-21: Adjusted noVNC defaults to reduce cursor misalignment and improve FPS by switching to remote resize, enabling view clip, and tuning quality/compression defaults.
 - 2026-02-21: Render deploy shows `getaddrinfo ENOTFOUND dpg-d6ap3goboq4c73dhnrh0-a` for DB host, indicating an invalid or incomplete `DATABASE_URL` on Render (hostname missing full domain).
+- 2026-02-21: Render internal DB URL appears truncated to short host (no domain), causing `ENOTFOUND`. If using a DB in a different account, switch to the External URL with `?sslmode=require` despite warnings, then run `npm run db:push` against that DB. If same account/region, attach DB via Render UI so `DATABASE_URL` is injected correctly.
