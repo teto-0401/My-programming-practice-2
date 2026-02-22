@@ -56,6 +56,7 @@ https://github.com/teto-0401/My-programming-practice
 ```
 
 ## Status
+- 2026-02-22: Switched top-page image picker to list local `uploads/` and mount via `/api/vm/set-image`, added `/api/vm/uploads` + `/api/vm/set-image` API routes and client hooks, and removed the unsupported QEMU `isa-fdc.driveA/driveB` globals that caused immediate exits.
 - 2026-02-22: Updated QEMU defaults to prefer `-cpu host` when KVM is available, set RAM default to 2048MB in server/client/DB schema, and confirmed boot order uses `-boot d` for ISO and `-boot c` for disk.
 - 2026-02-22: Avoided large upload timeouts by disabling HTTP server timeouts and returning upload responses immediately; DB persistence now runs in the background.
 - 2026-02-22: Removed upload size limits (multer file size cap and DB size gate). Uploads now attempt DB persistence regardless of size.

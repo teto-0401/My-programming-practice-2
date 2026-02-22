@@ -406,6 +406,43 @@ export async function registerRoutes(
     }
   });
 
+  // Set VM image from an existing local file (no upload)
+  app.post('/api/vm/set-image', async (req, res) => {
+    const { filename, imagePath } = req.body ?? {};
+    const safeName = typeof filename === 'string'
+      ? filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+      : null;
+
+    let resolvedPath: string | null = null;
+    if (safeName) {
+      resolvedPath = path.join(uploadDir, safeName);
+    } else if (typeof imagePath === 'string') {
+      resolvedPath = imagePath;
+    }
+
+    if (!resolvedPath) {
+      return res.status(400).json({ message: "filename or imagePath required" });
+    }
+
+    const normalizedUploadDir = path.resolve(uploadDir);
+    const normalizedPath = path.resolve(resolvedPath);
+    if (!normalizedPath.startsWith(normalizedUploadDir + path.sep)) {
+      return res.status(400).json({ message: "imagePath must be under uploads/" });
+    }
+
+    if (!fs.existsSync(normalizedPath)) {
+      return res.status(404).json({ message: "Image file not found" });
+    }
+
+    const vm = await storage.createOrUpdateVm({
+      imagePath: normalizedPath,
+      imageFilename: safeName ?? path.basename(normalizedPath),
+      status: 'stopped',
+    });
+
+    res.json({ success: true, vm });
+  });
+
   app.post(api.vm.start.path, async (req, res) => {
     const vm = await storage.getVm();
     if (!vm || !vm.imagePath) {
@@ -465,6 +502,35 @@ export async function registerRoutes(
       sizeBytes: img.sizeBytes,
       createdAt: img.createdAt?.toISOString?.() ?? new Date().toISOString(),
     })));
+  });
+
+  // List images present on the local uploads/ directory
+  app.get('/api/vm/uploads', async (_req, res) => {
+    try {
+      const entries = await fs.promises.readdir(uploadDir, { withFileTypes: true });
+      const allowed = new Set(['.iso', '.img', '.bin']);
+      const items = await Promise.all(entries
+        .filter(entry => entry.isFile())
+        .map(async (entry) => {
+          const filename = entry.name;
+          const ext = path.extname(filename).toLowerCase();
+          if (!allowed.has(ext)) return null;
+          const fullPath = path.join(uploadDir, filename);
+          const stat = await fs.promises.stat(fullPath);
+          return {
+            filename,
+            sizeBytes: stat.size,
+            modifiedAt: stat.mtime.toISOString(),
+          };
+        })
+      );
+      const filtered = items.filter((item): item is NonNullable<typeof item> => !!item);
+      filtered.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+      res.json(filtered);
+    } catch (e: any) {
+      console.error("Failed to list uploads:", e);
+      res.status(500).json({ message: "Failed to list uploads" });
+    }
   });
 
   // Mount a stored image back to the VM (write to uploads)

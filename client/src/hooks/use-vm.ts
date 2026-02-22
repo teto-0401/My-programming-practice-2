@@ -87,6 +87,7 @@ export function useUploadVmImage() {
           filename: data?.filename,
         });
         queryClient.invalidateQueries({ queryKey: [api.vm.get.path] });
+        queryClient.invalidateQueries({ queryKey: [api.vm.listUploads.path] });
         callbacks?.onSuccess?.(data);
       } else {
         try {
@@ -273,6 +274,68 @@ export function useMountStoredImage() {
     },
     onError: (error) => {
       logVm("POST /api/vm/images/:id/mount failed", { message: (error as Error).message });
+    },
+  });
+}
+
+// GET /api/vm/uploads
+export function useLocalUploads() {
+  return useQuery({
+    queryKey: [api.vm.listUploads.path],
+    queryFn: async () => {
+      const startedAt = performance.now();
+      const res = await fetch(api.vm.listUploads.path);
+      const durationMs = Math.round(performance.now() - startedAt);
+      const body = await readBodySafe(res);
+      logVm("GET /api/vm/uploads", {
+        status: res.status,
+        ok: res.ok,
+        durationMs,
+        body: body.json ?? body.text,
+      });
+      if (!res.ok) throw new Error("Failed to fetch uploads");
+      return api.vm.listUploads.responses[200].parse(body.json);
+    },
+    retry: false,
+  });
+}
+
+// POST /api/vm/set-image
+export function useSetVmImage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (filename: string) => {
+      const startedAt = performance.now();
+      const res = await fetch(api.vm.setImage.path, {
+        method: api.vm.setImage.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename }),
+      });
+      const durationMs = Math.round(performance.now() - startedAt);
+      const body = await readBodySafe(res);
+      logVm("POST /api/vm/set-image", {
+        status: res.status,
+        ok: res.ok,
+        durationMs,
+        filename,
+        body: body.json ?? body.text,
+      });
+      if (res.status === 404) {
+        const error = api.vm.setImage.responses[404].parse(body.json);
+        throw new Error(error.message);
+      }
+      if (!res.ok) {
+        const error = api.vm.setImage.responses[400].parse(body.json);
+        throw new Error(error.message);
+      }
+      return api.vm.setImage.responses[200].parse(body.json);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.vm.get.path] });
+      queryClient.invalidateQueries({ queryKey: [api.vm.listUploads.path] });
+    },
+    onError: (error) => {
+      logVm("POST /api/vm/set-image failed", { message: (error as Error).message });
     },
   });
 }

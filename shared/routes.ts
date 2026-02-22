@@ -81,5 +81,25 @@ export const api = {
         404: z.object({ message: z.string() }),
       },
     },
+    listUploads: {
+      method: 'GET' as const,
+      path: '/api/vm/uploads',
+      responses: {
+        200: z.array(z.object({
+          filename: z.string(),
+          sizeBytes: z.number(),
+          modifiedAt: z.string(),
+        })),
+      },
+    },
+    setImage: {
+      method: 'POST' as const,
+      path: '/api/vm/set-image',
+      responses: {
+        200: z.object({ success: z.boolean(), vm: z.custom<typeof vms.$inferSelect>() }),
+        400: z.object({ message: z.string() }),
+        404: z.object({ message: z.string() }),
+      },
+    },
   },
 };

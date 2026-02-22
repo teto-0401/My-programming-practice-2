@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Upload, CheckCircle, Loader2 } from "lucide-react";
-import { useUploadVmImage, useStoredImages, useMountStoredImage } from "@/hooks/use-vm";
+import { useUploadVmImage, useLocalUploads, useSetVmImage } from "@/hooks/use-vm";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 
 export function FileUploader({ currentImage }: { currentImage?: string | null }) {
   const [dragActive, setDragActive] = useState(false);
-  const [mountingId, setMountingId] = useState<number | null>(null);
+  const [mountingName, setMountingName] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { upload, progress, isUploading } = useUploadVmImage();
-  const { data: storedImages, isLoading: isLoadingImages } = useStoredImages();
-  const { mutate: mountImage } = useMountStoredImage();
+  const { data: localUploads, isLoading: isLoadingUploads } = useLocalUploads();
+  const { mutate: setImage } = useSetVmImage();
   const { toast } = useToast();
+  const currentFilename = currentImage ? currentImage.split('/').pop() : null;
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -175,13 +176,13 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
       </div>
 
       <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Saved Images</h4>
-        {isLoadingImages ? (
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Local Uploads</h4>
+        {isLoadingUploads ? (
           <div className="text-xs text-muted-foreground">Loading...</div>
-        ) : storedImages && storedImages.length > 0 ? (
+        ) : localUploads && localUploads.length > 0 ? (
           <div className="space-y-2">
-            {storedImages.map((img) => (
-              <div key={img.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+            {localUploads.map((img) => (
+              <div key={img.filename} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-foreground truncate">{img.filename}</div>
                   <div className="text-xs text-muted-foreground">{formatFileSize(img.sizeBytes)}</div>
@@ -189,16 +190,16 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={mountingId === img.id}
+                  disabled={mountingName === img.filename || currentFilename === img.filename}
                   onClick={() => {
-                    setMountingId(img.id);
-                    mountImage(img.id, {
-                      onSuccess: (data) => {
+                    setMountingName(img.filename);
+                    setImage(img.filename, {
+                      onSuccess: () => {
                         toast({
                           title: "Image mounted",
-                          description: data.filename,
+                          description: img.filename,
                         });
-                        setMountingId(null);
+                        setMountingName(null);
                       },
                       onError: (error) => {
                         toast({
@@ -206,12 +207,12 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
                           description: error.message,
                           variant: "destructive",
                         });
-                        setMountingId(null);
+                        setMountingName(null);
                       },
                     });
                   }}
                 >
-                  {mountingId === img.id ? "Mounting..." : "Mount"}
+                  {currentFilename === img.filename ? "Mounted" : (mountingName === img.filename ? "Mounting..." : "Mount")}
                 </Button>
               </div>
             ))}
