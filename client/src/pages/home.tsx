@@ -18,7 +18,7 @@ export default function Home() {
   const { mutate: startFromSnapshot, isPending: isRestoring } = useStartFromSnapshot();
   const { toast } = useToast();
 
-  const [ramMb, setRamMb] = useState(512);
+  const [ramMb, setRamMb] = useState(2048);
   const [vramMb, setVramMb] = useState(16);
 
   const handleStartFromSnapshot = (snapshotName: string) => {

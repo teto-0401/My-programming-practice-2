@@ -12,7 +12,7 @@ export const vms = pgTable("vms", {
   imagePath: text("image_path"), // Path to the uploaded .bin/.iso
   imageFilename: text("image_filename"), // Original filename to detect extension
   vncPort: integer("vnc_port"),
-  ramMb: integer("ram_mb").notNull().default(512), // RAM in MB (default 512MB for speed)
+  ramMb: integer("ram_mb").notNull().default(2048), // RAM in MB (default 2GB)
   vramMb: integer("vram_mb").notNull().default(16), // VRAM in MB (default 16MB for low overhead)
   createdAt: timestamp("created_at").defaultNow(),
 });

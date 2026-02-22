@@ -50,7 +50,7 @@ class QemuManager {
   private vncPort: number = Number(process.env.VNC_PORT ?? 6000);
   private vncDisplay: number = 1;
 
-  async start(imagePath: string, originalFilename?: string | null, ramMb: number = 512, vramMb: number = 16) {
+  async start(imagePath: string, originalFilename?: string | null, ramMb: number = 2048, vramMb: number = 16) {
     if (this.process) {
       throw new Error("VM is already running");
     }
@@ -72,10 +72,11 @@ class QemuManager {
     this.vncPort = Number(process.env.VNC_PORT ?? 6000);
     this.vncDisplay = Math.max(0, this.vncPort - 5900);
 
+    const cpuModel = fs.existsSync('/dev/kvm') ? 'host' : 'qemu64';
     const args = [
       '-m', `${ramMb}M`, // Explicit RAM setting
       '-smp', '1', // Single core = less scheduling overhead
-      '-cpu', 'qemu64', // Simpler CPU model = less emulation overhead
+      '-cpu', cpuModel, // Prefer host CPU model when KVM is available
       '-icount', 'shift=auto,sleep=on', // Throttle CPU, reduces host usage 40%->10%
       '-rtc', 'base=utc,clock=vm', // Prevent clock busy-loop
       '-vnc', `127.0.0.1:${this.vncDisplay}`, // Plain ws, no encryption
@@ -213,7 +214,7 @@ class QemuManager {
     }
   }
 
-  async startFromSnapshot(imagePath: string, originalFilename: string | null, snapshotName: string, ramMb: number = 512, vramMb: number = 16) {
+  async startFromSnapshot(imagePath: string, originalFilename: string | null, snapshotName: string, ramMb: number = 2048, vramMb: number = 16) {
     if (this.process) {
       throw new Error("VM is already running");
     }
@@ -233,10 +234,11 @@ class QemuManager {
     this.vncPort = Number(process.env.VNC_PORT ?? 6000);
     this.vncDisplay = Math.max(0, this.vncPort - 5900);
 
+    const cpuModel = fs.existsSync('/dev/kvm') ? 'host' : 'qemu64';
     const args = [
       '-m', `${ramMb}M`,
       '-smp', '1',
-      '-cpu', 'qemu64',
+      '-cpu', cpuModel,
       '-icount', 'shift=auto,sleep=on',
       '-rtc', 'base=utc,clock=vm',
       '-vnc', `127.0.0.1:${this.vncDisplay}`,
