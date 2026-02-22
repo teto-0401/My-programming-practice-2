@@ -31,12 +31,9 @@ const multerStorage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
-  storage: multerStorage,
-  limits: { fileSize: 10 * 1024 * 1024 * 1024 } // 10GB limit
+const upload = multer({
+  storage: multerStorage
 });
-
-const maxDbImageBytes = Number(process.env.MAX_DB_IMAGE_MB ?? 200) * 1024 * 1024;
 
 // Snapshots directory
 const snapshotsDir = path.join(baseDir, "snapshots");
@@ -390,22 +387,21 @@ export async function registerRoutes(
       status: 'stopped'
     });
 
-    let storedImageId: number | null = null;
-    if (fileSize <= maxDbImageBytes) {
-      try {
-        const fileBuffer = await fs.promises.readFile(req.file.path);
-        const stored = await storage.createImage({
-          filename: safeName,
-          contentBase64: fileBuffer.toString("base64"),
-          sizeBytes: fileSize,
-        });
-        storedImageId = stored.id;
-      } catch (e) {
-        console.error("Failed to store image in DB:", e);
-      }
-    }
+    // Respond immediately to avoid upstream/proxy timeouts on large uploads.
+    res.json({ success: true, path: req.file.path, filename: req.file.originalname, storedImageId: null });
 
-    res.json({ success: true, path: req.file.path, filename: req.file.originalname, storedImageId });
+    // Persist in DB in the background.
+    try {
+      const fileBuffer = await fs.promises.readFile(req.file.path);
+      const stored = await storage.createImage({
+        filename: safeName,
+        contentBase64: fileBuffer.toString("base64"),
+        sizeBytes: fileSize,
+      });
+      console.log("Stored image in DB:", stored.id, safeName, fileSize);
+    } catch (e) {
+      console.error("Failed to store image in DB:", e);
+    }
   });
 
   app.post(api.vm.start.path, async (req, res) => {

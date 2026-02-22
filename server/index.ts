@@ -15,6 +15,10 @@ process.on("uncaughtException", (err) => {
 
 const app = express();
 const httpServer = createServer(app);
+// Avoid server-side timeouts for large uploads
+httpServer.requestTimeout = 0;
+httpServer.headersTimeout = 0;
+httpServer.keepAliveTimeout = 0;
 
 declare module "http" {
   interface IncomingMessage {

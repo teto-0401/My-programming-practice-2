@@ -19,7 +19,6 @@ QEMU / noVNC based virtual OS simulator with a Node.js + Express backend, Vite +
 - `DATABASE_URL` (required). Render-issued Postgres access token URL, e.g. `postgresql://abc_d...`
 - `PORT` (default 5000)
 - `VNC_PORT` (default 6000)
-- `MAX_DB_IMAGE_MB` (default 200). Max upload size to persist in DB for reuse.
 - `COLOR` (optional, default `DARK`). UI color mode for client theme. Supported values: `DARK` (current theme) or `WHITE` (gray-based light theme).
 
 ## Docker
@@ -44,6 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/
 ## Deployment Notes (Prep)
 - Target platform is Render. Because Render uses ephemeral filesystems on deploys and restarts, treat `uploads/` as non-persistent.
 - Plan: store ISO and snapshot payloads in Postgres (DB as source of truth) and avoid relying on `uploads/` for long-term storage.
+- Decision (2026-02-22): proceed with DB upload/storage as the primary path for VM image persistence.
 - Current Replit setup is ~90% complete; this repo will be duplicated for Render with storage changes.
 
 ## Workflow: Status + Push
@@ -56,6 +56,8 @@ https://github.com/teto-0401/My-programming-practice
 ```
 
 ## Status
+- 2026-02-22: Removed upload size limits (multer file size cap and DB size gate). Uploads now attempt DB persistence regardless of size.
+- 2026-02-22: `npm run dev` startup confirmed after fixes. Proceeding with DB upload/storage approach as the default persistence path (instead of relying on local `uploads/`).
 - 2026-02-22: Added startup DB bootstrap (`CREATE TABLE IF NOT EXISTS` for `vms` and `vm_images`) so app can recover when connected to a fresh DB without running migrations first.
 - 2026-02-22: Fixed websocket upgrade conflict by switching VNC proxy `ws` server to `noServer` mode and handling only `/websockify`, avoiding interference with Vite HMR websocket.
 - 2026-02-22: Added `COLOR` env-based UI theme switch for `npm run dev` client rendering. `COLOR=DARK` keeps current dark UI; `COLOR=WHITE` applies a gray-based light theme via CSS variables and adjusted VM display header hover colors for readability.
