@@ -56,6 +56,7 @@ https://github.com/teto-0401/My-programming-practice
 ```
 
 ## Status
+- 2026-02-22: Avoided large upload timeouts by disabling HTTP server timeouts and returning upload responses immediately; DB persistence now runs in the background.
 - 2026-02-22: Removed upload size limits (multer file size cap and DB size gate). Uploads now attempt DB persistence regardless of size.
 - 2026-02-22: `npm run dev` startup confirmed after fixes. Proceeding with DB upload/storage approach as the default persistence path (instead of relying on local `uploads/`).
 - 2026-02-22: Added startup DB bootstrap (`CREATE TABLE IF NOT EXISTS` for `vms` and `vm_images`) so app can recover when connected to a fresh DB without running migrations first.
