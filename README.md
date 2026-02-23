@@ -34,6 +34,11 @@ QEMU / noVNC based virtual OS simulator with a Node.js + Express backend, Vite +
 - HMR: Replit needs WSS + external domain for Vite HMR. This project configures HMR using `REPLIT_DEV_DOMAIN` when available.
 - Postgres (Render external URL) requires SSL. The server enables `ssl: { rejectUnauthorized: false }` for `pg` Pool.
 - If you see `EADDRINUSE 0.0.0.0:5000`, another dev server is already running. Stop it with `Ctrl+C` and restart.
+ - Windows ISO install (Replit/noVNC): use port `:100` to match the noVNC proxy.
+
+```bash
+qemu-system-x86_64 -m 4096M -smp 2 -cpu qemu64 -vnc 127.0.0.1:100 -device usb-ehci -device usb-tablet -vga cirrus -drive file=uploads/win10_22h2.qcow2,if=virtio,format=qcow2 -cdrom uploads/Win10_22H2_Japanese_x64v1.iso -boot d -net nic,model=e1000 -net user
+```
 
 ## Render CLI
 ```
@@ -56,6 +61,8 @@ https://github.com/teto-0401/My-programming-practice
 ```
 
 ## Status
+- 2026-02-23: Started Windows 10 22H2 ISO install attempt via QEMU/noVNC on port `:100` using a new qcow2 disk (`uploads/win10_22h2.qcow2`). KVM not available (`/dev/kvm` missing), so installs are expected to be slow.
+- 2026-02-23: Added a Replit/noVNC Windows ISO QEMU launch command to this README and noted that we are intentionally writing this change here (per user request).
 - 2026-02-22: Switched top-page image picker to list local `uploads/` and mount via `/api/vm/set-image`, added `/api/vm/uploads` + `/api/vm/set-image` API routes and client hooks, and removed the unsupported QEMU `isa-fdc.driveA/driveB` globals that caused immediate exits.
 - 2026-02-22: Updated QEMU defaults to prefer `-cpu host` when KVM is available, set RAM default to 2048MB in server/client/DB schema, and confirmed boot order uses `-boot d` for ISO and `-boot c` for disk.
 - 2026-02-22: Avoided large upload timeouts by disabling HTTP server timeouts and returning upload responses immediately; DB persistence now runs in the background.
