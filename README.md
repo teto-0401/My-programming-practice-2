@@ -63,6 +63,7 @@ https://github.com/teto-0401/My-programming-practice
 ```
 
 ## Status
+- 2026-02-25: UEFI enablement notes: QEMU now boots with OVMF by default. Place `OVMF_CODE.fd` and `OVMF_VARS.fd` under `uploads/` (auto-detected), or set `OVMF_CODE_PATH`/`OVMF_VARS_PATH`. If boot fails, open the OVMF boot manager and confirm the disk/ISO entry, then retry install. For Windows UEFI installs, delete all partitions so the installer recreates GPT + EFI.
 - 2026-02-25: Next steps (handoff): Win11 is UEFI-only. Current `win10_22h2.qcow2` fails because install ended mid-way. Plan: do a fresh Win11 install under UEFI. Use `Win11_25H2_Japanese_x64.iso` as boot media and create a new qcow2 disk (or delete/recreate `win11_25h2.qcow2`). In installer, delete all partitions and let it recreate GPT/EFI, then complete install in one session if possible.
 - 2026-02-25: Added OVMF auto-detection for uploads/ and 4M firmware filenames to simplify UEFI boot without system installs.
 - 2026-02-25: Switched server-side QEMU launch to UEFI (OVMF) by default. Added env overrides for OVMF paths and per-run copy of `OVMF_VARS.fd`.
