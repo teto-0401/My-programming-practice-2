@@ -49,8 +49,80 @@ class QemuManager {
   private qmpSocket: net.Socket | null = null;
   private vncPort: number = Number(process.env.VNC_PORT ?? 6000);
   private vncDisplay: number = 1;
+  private ovmfVarsPath: string | null = null;
 
-  async start(imagePath: string, originalFilename?: string | null, ramMb: number = 2048, vramMb: number = 16) {
+  private resolveOvmfPaths(): { code: string; vars: string } {
+    const codeEnv = process.env.OVMF_CODE_PATH;
+    const varsEnv = process.env.OVMF_VARS_PATH;
+    if (codeEnv && varsEnv) {
+      if (!fs.existsSync(codeEnv)) {
+        throw new Error(`OVMF code not found: ${codeEnv}`);
+      }
+      if (!fs.existsSync(varsEnv)) {
+        throw new Error(`OVMF vars not found: ${varsEnv}`);
+      }
+      return { code: codeEnv, vars: varsEnv };
+    }
+
+    const uploadsDir = path.join(baseDir, "uploads");
+    const codeCandidates = [
+      path.join(uploadsDir, 'OVMF_CODE.fd'),
+      path.join(uploadsDir, 'OVMF_CODE_4M.fd'),
+      path.join(uploadsDir, 'OVMF_CODE.4m.fd'),
+      '/usr/share/OVMF/OVMF_CODE.fd',
+      '/usr/share/OVMF/OVMF_CODE_4M.fd',
+      '/usr/share/edk2/ovmf/OVMF_CODE.fd',
+      '/usr/share/edk2/ovmf/OVMF_CODE_4M.fd',
+      '/usr/share/edk2/x64/OVMF_CODE.4m.fd',
+      '/usr/share/ovmf/OVMF_CODE.fd',
+      '/usr/share/edk2/ovmf/OVMF_CODE.fd',
+      '/usr/share/qemu/OVMF_CODE.fd',
+    ];
+    const varsCandidates = [
+      path.join(uploadsDir, 'OVMF_VARS.fd'),
+      path.join(uploadsDir, 'OVMF_VARS_4M.fd'),
+      path.join(uploadsDir, 'OVMF_VARS.4m.fd'),
+      '/usr/share/OVMF/OVMF_VARS.fd',
+      '/usr/share/OVMF/OVMF_VARS_4M.fd',
+      '/usr/share/edk2/ovmf/OVMF_VARS.fd',
+      '/usr/share/edk2/ovmf/OVMF_VARS_4M.fd',
+      '/usr/share/edk2/x64/OVMF_VARS.4m.fd',
+      '/usr/share/ovmf/OVMF_VARS.fd',
+      '/usr/share/edk2/ovmf/OVMF_VARS.fd',
+      '/usr/share/qemu/OVMF_VARS.fd',
+    ];
+
+    const code = codeCandidates.find(p => fs.existsSync(p));
+    const vars = varsCandidates.find(p => fs.existsSync(p));
+    if (!code || !vars) {
+      throw new Error(
+        "UEFI firmware not found. Install OVMF or set OVMF_CODE_PATH and OVMF_VARS_PATH."
+      );
+    }
+    return { code, vars };
+  }
+
+  private ensureOvmfVarsCopy(varsPath: string): string {
+    if (this.ovmfVarsPath && fs.existsSync(this.ovmfVarsPath)) {
+      return this.ovmfVarsPath;
+    }
+    const varsCopy = path.join(
+      snapshotsDir,
+      `ovmf_vars_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.fd`
+    );
+    fs.copyFileSync(varsPath, varsCopy);
+    this.ovmfVarsPath = varsCopy;
+    return varsCopy;
+  }
+
+  async start(
+    imagePath: string,
+    originalFilename?: string | null,
+    ramMb: number = 2048,
+    vramMb: number = 16,
+    bootMediaPath?: string | null,
+    bootMediaFilename?: string | null,
+  ) {
     if (this.process) {
       throw new Error("VM is already running");
     }
@@ -62,7 +134,7 @@ class QemuManager {
     // Detect file type from original filename
     const extension = originalFilename?.split('.').pop()?.toLowerCase() || '';
     const isISO = extension === 'iso';
-    const isBinOrImg = extension === 'bin' || extension === 'img';
+    const isQcow2 = extension === 'qcow2';
 
     // CPU Usage Optimization:
     // - '-icount shift=auto' limits CPU cycles, reduces host CPU usage significantly
@@ -73,6 +145,9 @@ class QemuManager {
     this.vncDisplay = Math.max(0, this.vncPort - 5900);
 
     const cpuModel = fs.existsSync('/dev/kvm') ? 'host' : 'qemu64';
+    const { code: ovmfCode, vars: ovmfVars } = this.resolveOvmfPaths();
+    const ovmfVarsCopy = this.ensureOvmfVarsCopy(ovmfVars);
+
     const args = [
       '-m', `${ramMb}M`, // Explicit RAM setting
       '-smp', '1', // Single core = less scheduling overhead
@@ -84,6 +159,9 @@ class QemuManager {
       '-device', 'usb-tablet', // Absolute mouse positioning
       '-vga', 'cirrus', // Cirrus VGA = simpler, less CPU than std VGA
       '-qmp', 'tcp:127.0.0.1:4444,server,nowait', // QMP for machine control
+      // UEFI firmware (OVMF)
+      '-drive', `if=pflash,format=raw,readonly=on,file=${ovmfCode}`,
+      '-drive', `if=pflash,format=raw,file=${ovmfVarsCopy}`,
     ];
 
     // Add drive based on file type
@@ -92,6 +170,31 @@ class QemuManager {
       args.push('-cdrom', imagePath);
       args.push('-boot', 'd'); // Boot from CD-ROM
       console.log("Mounting as CD-ROM (ISO)");
+    } else if (isQcow2) {
+      const bootExt = path.extname(bootMediaFilename ?? bootMediaPath ?? "").toLowerCase();
+      if (bootMediaPath && bootExt === '.iso') {
+        args.push('-drive', `file=${imagePath},format=qcow2,if=ide,index=0,media=disk`);
+        args.push('-cdrom', bootMediaPath);
+        args.push('-boot', 'd');
+        console.log("Mounting QCOW2 + installer ISO:", bootMediaPath);
+      } else if (bootMediaPath && (bootExt === '.bin' || bootExt === '.img')) {
+        // Recovery BIN/IMG usually behaves better as USB media.
+        args.push('-device', 'qemu-xhci');
+        args.push('-drive', `if=none,id=usbboot,file=${bootMediaPath},format=raw,readonly=on`);
+        args.push('-device', 'usb-storage,drive=usbboot');
+        args.push('-drive', `file=${imagePath},format=qcow2,if=ide,index=0,media=disk`);
+        args.push('-boot', 'c');
+        console.log("Mounting QCOW2 + boot media USB:", bootMediaPath);
+      } else if (bootMediaPath && bootExt === '.qcow2') {
+        args.push('-drive', `file=${bootMediaPath},format=qcow2,if=ide,index=0,media=disk`);
+        args.push('-drive', `file=${imagePath},format=qcow2,if=ide,index=1,media=disk`);
+        args.push('-boot', 'c');
+        console.log("Mounting QCOW2 + boot media disk:", bootMediaPath);
+      } else {
+        args.push('-drive', `file=${imagePath},format=qcow2,if=ide,index=0,media=disk`);
+        args.push('-boot', 'c');
+      }
+      console.log("Mounting as hard drive (QCOW2)");
     } else {
       // BIN/IMG files - try multiple interface types for compatibility
       // Use IDE for better compatibility with various OS images
@@ -235,6 +338,9 @@ class QemuManager {
     this.vncDisplay = Math.max(0, this.vncPort - 5900);
 
     const cpuModel = fs.existsSync('/dev/kvm') ? 'host' : 'qemu64';
+    const { code: ovmfCode, vars: ovmfVars } = this.resolveOvmfPaths();
+    const ovmfVarsCopy = this.ensureOvmfVarsCopy(ovmfVars);
+
     const args = [
       '-m', `${ramMb}M`,
       '-smp', '1',
@@ -247,6 +353,9 @@ class QemuManager {
       '-vga', 'cirrus',
       '-qmp', 'tcp:127.0.0.1:4444,server,nowait',
       '-incoming', `exec:cat ${snapshotPath}`, // Load state from snapshot
+      // UEFI firmware (OVMF)
+      '-drive', `if=pflash,format=raw,readonly=on,file=${ovmfCode}`,
+      '-drive', `if=pflash,format=raw,file=${ovmfVarsCopy}`,
     ];
 
     if (isISO) {
@@ -450,7 +559,28 @@ export async function registerRoutes(
     }
 
     try {
-      await qemu.start(vm.imagePath, vm.imageFilename, vm.ramMb, vm.vramMb);
+      const bootMediaFilenameRaw = req.body?.bootMediaFilename;
+      let bootMediaPath: string | null = null;
+      let bootMediaFilename: string | null = null;
+
+      if (typeof bootMediaFilenameRaw === "string" && bootMediaFilenameRaw.trim().length > 0) {
+        const safeMedia = bootMediaFilenameRaw.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const ext = path.extname(safeMedia).toLowerCase();
+        if (!['.iso', '.bin', '.img', '.qcow2'].includes(ext)) {
+          return res.status(400).json({ message: "bootMediaFilename must be .iso/.bin/.img/.qcow2" });
+        }
+        const resolvedMedia = path.resolve(path.join(uploadDir, safeMedia));
+        if (!resolvedMedia.startsWith(path.resolve(uploadDir) + path.sep)) {
+          return res.status(400).json({ message: "bootMediaFilename must be under uploads/" });
+        }
+        if (!fs.existsSync(resolvedMedia)) {
+          return res.status(404).json({ message: "Selected boot media not found" });
+        }
+        bootMediaPath = resolvedMedia;
+        bootMediaFilename = safeMedia;
+      }
+
+      await qemu.start(vm.imagePath, vm.imageFilename, vm.ramMb, vm.vramMb, bootMediaPath, bootMediaFilename);
       await storage.updateVmStatus(vm.id, 'running');
       res.json({ success: true, message: "VM started" });
     } catch (e: any) {
@@ -508,7 +638,7 @@ export async function registerRoutes(
   app.get('/api/vm/uploads', async (_req, res) => {
     try {
       const entries = await fs.promises.readdir(uploadDir, { withFileTypes: true });
-      const allowed = new Set(['.iso', '.img', '.bin']);
+      const allowed = new Set(['.iso', '.img', '.bin', '.qcow2']);
       const items = await Promise.all(entries
         .filter(entry => entry.isFile())
         .map(async (entry) => {

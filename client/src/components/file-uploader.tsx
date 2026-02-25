@@ -15,6 +15,11 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
   const { mutate: setImage } = useSetVmImage();
   const { toast } = useToast();
   const currentFilename = currentImage ? currentImage.split('/').pop() : null;
+  const diskUploads = (localUploads ?? []).filter((f) => f.filename.toLowerCase().endsWith(".qcow2"));
+  const mediaUploads = (localUploads ?? []).filter((f) => {
+    const lower = f.filename.toLowerCase();
+    return lower.endsWith(".iso") || lower.endsWith(".img") || lower.endsWith(".bin");
+  });
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -43,13 +48,13 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
   };
 
   const handleFile = (file: File) => {
-    const validExtensions = ['.bin', '.iso', '.img'];
+    const validExtensions = ['.bin', '.iso', '.img', '.qcow2'];
     const extension = '.' + file.name.split('.').pop()?.toLowerCase();
     
     if (!validExtensions.includes(extension)) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a .bin, .iso, or .img file.",
+        description: "Please upload a .bin, .iso, .img, or .qcow2 file.",
         variant: "destructive",
       });
       return;
@@ -116,7 +121,7 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
           ref={inputRef}
           type="file"
           className="hidden"
-          accept=".bin,.iso,.img"
+          accept=".bin,.iso,.img,.qcow2"
           onChange={handleChange}
           data-testid="input-file"
         />
@@ -161,7 +166,7 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
                   Click or drag file to upload
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Supports .bin, .iso, .img (ChromeOS Flex images)
+                  Supports .bin, .iso, .img, .qcow2
                 </p>
               </div>
             </motion.div>
@@ -175,13 +180,13 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
         )}
       </div>
 
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Local Uploads</h4>
+      <div className="space-y-3">
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Disks (.qcow2)</h4>
         {isLoadingUploads ? (
           <div className="text-xs text-muted-foreground">Loading...</div>
-        ) : localUploads && localUploads.length > 0 ? (
+        ) : diskUploads.length > 0 ? (
           <div className="space-y-2">
-            {localUploads.map((img) => (
+            {diskUploads.map((img) => (
               <div key={img.filename} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-foreground truncate">{img.filename}</div>
@@ -195,18 +200,11 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
                     setMountingName(img.filename);
                     setImage(img.filename, {
                       onSuccess: () => {
-                        toast({
-                          title: "Image mounted",
-                          description: img.filename,
-                        });
+                        toast({ title: "Disk mounted", description: img.filename });
                         setMountingName(null);
                       },
                       onError: (error) => {
-                        toast({
-                          title: "Mount failed",
-                          description: error.message,
-                          variant: "destructive",
-                        });
+                        toast({ title: "Mount failed", description: error.message, variant: "destructive" });
                         setMountingName(null);
                       },
                     });
@@ -218,7 +216,45 @@ export function FileUploader({ currentImage }: { currentImage?: string | null })
             ))}
           </div>
         ) : (
-          <div className="text-xs text-muted-foreground">No saved images yet.</div>
+          <div className="text-xs text-muted-foreground">No qcow2 disks.</div>
+        )}
+
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Boot Media (.iso/.img/.bin)</h4>
+        {isLoadingUploads ? (
+          <div className="text-xs text-muted-foreground">Loading...</div>
+        ) : mediaUploads.length > 0 ? (
+          <div className="space-y-2">
+            {mediaUploads.map((img) => (
+              <div key={img.filename} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-foreground truncate">{img.filename}</div>
+                  <div className="text-xs text-muted-foreground">{formatFileSize(img.sizeBytes)}</div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={mountingName === img.filename || currentFilename === img.filename}
+                  onClick={() => {
+                    setMountingName(img.filename);
+                    setImage(img.filename, {
+                      onSuccess: () => {
+                        toast({ title: "Media mounted", description: img.filename });
+                        setMountingName(null);
+                      },
+                      onError: (error) => {
+                        toast({ title: "Mount failed", description: error.message, variant: "destructive" });
+                        setMountingName(null);
+                      },
+                    });
+                  }}
+                >
+                  {currentFilename === img.filename ? "Mounted" : (mountingName === img.filename ? "Mounting..." : "Mount")}
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground">No boot media files.</div>
         )}
       </div>
     </div>

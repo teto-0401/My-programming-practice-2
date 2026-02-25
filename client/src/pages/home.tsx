@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useVm, useStartVm, useStopVm, useSnapshots, useSaveSnapshot, useDeleteSnapshot, useUpdateVmSettings, useStartFromSnapshot } from "@/hooks/use-vm";
+import { useVm, useStartVm, useStopVm, useSnapshots, useSaveSnapshot, useDeleteSnapshot, useUpdateVmSettings, useStartFromSnapshot, useLocalUploads } from "@/hooks/use-vm";
 import { FileUploader } from "@/components/file-uploader";
 import { VmDisplay } from "@/components/vm-display";
 import { StatusBadge } from "@/components/status-badge";
@@ -16,10 +16,12 @@ export default function Home() {
   const { mutate: deleteSnapshot } = useDeleteSnapshot();
   const { mutate: updateSettings, isPending: isUpdating } = useUpdateVmSettings();
   const { mutate: startFromSnapshot, isPending: isRestoring } = useStartFromSnapshot();
+  const { data: localUploads } = useLocalUploads();
   const { toast } = useToast();
 
   const [ramMb, setRamMb] = useState(2048);
   const [vramMb, setVramMb] = useState(16);
+  const [bootMediaFilename, setBootMediaFilename] = useState("");
 
   const handleStartFromSnapshot = (snapshotName: string) => {
     if (!hasImage) {
@@ -45,6 +47,17 @@ export default function Home() {
 
   const isRunning = vm?.status === "running";
   const hasImage = !!vm?.imagePath;
+  const isQcow2Selected = (vm?.imageFilename ?? "").toLowerCase().endsWith(".qcow2");
+  const bootMediaUploads = (localUploads ?? []).filter((f) => {
+    const lower = f.filename.toLowerCase();
+    return lower.endsWith(".iso") || lower.endsWith(".img") || lower.endsWith(".bin");
+  });
+
+  useEffect(() => {
+    if (!isQcow2Selected) {
+      setBootMediaFilename("");
+    }
+  }, [isQcow2Selected]);
 
   const handleSaveSettings = () => {
     updateSettings({ ramMb, vramMb }, {
@@ -91,7 +104,11 @@ export default function Home() {
       });
       return;
     }
-    startVm(undefined, {
+    startVm(
+      isQcow2Selected && bootMediaFilename
+        ? { bootMediaFilename }
+        : undefined,
+      {
       onSuccess: () => {
         toast({ title: "System Initializing", description: "Boot sequence started..." });
       },
@@ -188,6 +205,27 @@ export default function Home() {
               </div>
 
               <div className="space-y-4">
+                {isQcow2Selected && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Boot Media (optional)</span>
+                    </div>
+                    <select
+                      value={bootMediaFilename}
+                      onChange={(e) => setBootMediaFilename(e.target.value)}
+                      disabled={isRunning || isStarting}
+                      className="w-full p-2 rounded-lg bg-muted/30 border border-border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                    >
+                      <option value="">No media</option>
+                      {bootMediaUploads.map((media) => (
+                        <option key={media.filename} value={media.filename}>
+                          {media.filename}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">CPU Cores</span>
                   <span className="font-mono font-bold">4 vCPU</span>

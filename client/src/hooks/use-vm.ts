@@ -132,11 +132,12 @@ export function useUploadVmImage() {
 export function useStartVm() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload?: { bootMediaFilename?: string }) => {
       const startedAt = performance.now();
       const res = await fetch(api.vm.start.path, {
         method: api.vm.start.method,
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload ?? {}),
       });
       const durationMs = Math.round(performance.now() - startedAt);
       const body = await readBodySafe(res);
@@ -148,8 +149,8 @@ export function useStartVm() {
       });
 
       if (!res.ok) {
-        const error = api.vm.start.responses[400].parse(body.json);
-        throw new Error(error.message);
+        const error = body.json as { message?: string } | null;
+        throw new Error(error?.message ?? "Failed to start VM");
       }
       return api.vm.start.responses[200].parse(body.json);
     },
@@ -360,7 +361,7 @@ export function useSaveSnapshot() {
 
       if (!res.ok) {
         const error = body.json as { message?: string } | null;
-        throw new Error(error.message);
+        throw new Error(error?.message ?? "Failed to save snapshot");
       }
       return body.json as { success: boolean; name: string; message: string };
     },

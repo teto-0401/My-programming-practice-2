@@ -20,6 +20,8 @@ QEMU / noVNC based virtual OS simulator with a Node.js + Express backend, Vite +
 - `PORT` (default 5000)
 - `VNC_PORT` (default 6000)
 - `COLOR` (optional, default `DARK`). UI color mode for client theme. Supported values: `DARK` (current theme) or `WHITE` (gray-based light theme).
+- `OVMF_CODE_PATH` (optional). Override UEFI firmware code path (OVMF). Required only if not found in standard locations.
+- `OVMF_VARS_PATH` (optional). Override UEFI firmware vars path (OVMF). Required only if not found in standard locations.
 
 ## Docker
 `Dockerfile` builds a multi-stage image and runs `node dist/index.cjs`.
@@ -61,6 +63,9 @@ https://github.com/teto-0401/My-programming-practice
 ```
 
 ## Status
+- 2026-02-25: Added OVMF auto-detection for uploads/ and 4M firmware filenames to simplify UEFI boot without system installs.
+- 2026-02-25: Switched server-side QEMU launch to UEFI (OVMF) by default. Added env overrides for OVMF paths and per-run copy of `OVMF_VARS.fd`.
+- 2026-02-23: Split local upload display by role (`.qcow2` disks vs `.iso/.img/.bin` boot media) and re-enabled qcow2 start with optional boot media selection; `.bin/.img` boot media are attached as USB for recovery-style boot attempts.
 - 2026-02-23: Started Windows 10 22H2 ISO install attempt via QEMU/noVNC on port `:100` using a new qcow2 disk (`uploads/win10_22h2.qcow2`). KVM not available (`/dev/kvm` missing), so installs are expected to be slow.
 - 2026-02-23: Added a Replit/noVNC Windows ISO QEMU launch command to this README and noted that we are intentionally writing this change here (per user request).
 - 2026-02-22: Switched top-page image picker to list local `uploads/` and mount via `/api/vm/set-image`, added `/api/vm/uploads` + `/api/vm/set-image` API routes and client hooks, and removed the unsupported QEMU `isa-fdc.driveA/driveB` globals that caused immediate exits.
